@@ -211,6 +211,27 @@ async function authenticate(name: string, pin: string): Promise<void> {
     );
   }
 }
+/** Latest published version, or undefined if offline/disabled. Never throws. */
+async function latestVersion(): Promise<string | undefined> {
+  if (process.env.UC_NO_UPDATE_CHECK) return undefined;
+  try {
+    const res = await fetch("https://registry.npmjs.org/uc-config/latest", {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return undefined;
+    const v = ((await res.json()) as { version?: unknown }).version;
+    return typeof v === "string" ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function newer(a: string, b: string): boolean {
+  const p = (v: string) => v.split("-")[0]!.split(".").map(Number);
+  const [x, y] = [p(a), p(b)];
+  for (let i = 0; i < 3; i++)
+    if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
+}
 async function question(label: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -228,6 +249,11 @@ program
     console.log(
       `Identity verified; core ${target.version.core}, reported API ${target.version.api}`,
     );
+    const latest = await latestVersion();
+    if (latest && newer(latest, pkgVersion))
+      console.log(
+        `Update available: uc-config ${pkgVersion} -> ${latest}. Run: npm install uc-config@latest && npx uc-config init --refresh-docs (see CHANGELOG.md)`,
+      );
     for (const path of [
       "/entities",
       "/activities",
@@ -626,11 +652,24 @@ program
   .option("--host <ip>", "remote IP address (skips the prompt)")
   .option("--target <name>", "target name", "home")
   .option("--no-connect", "only create files; don't connect or authenticate")
+  .option(
+    "--refresh-docs",
+    "update AGENTS.md/CLAUDE.md to this version (edited files get a .new copy)",
+  )
   .action(async (o) => {
-    const r = await init(root(), pkgVersion);
+    const r = await init(root(), pkgVersion, { refreshDocs: o.refreshDocs });
     for (const f of r.written) console.log(`created ${f}`);
     if (r.packageJsonUpdated) console.log("added uc-config to package.json");
+    for (const f of r.refreshed) console.log(`updated ${f} to v${pkgVersion}`);
+    for (const f of r.conflicts)
+      console.log(
+        `kept ${f} (edited); wrote ${f}.new. Merge your changes, then delete ${f}.new`,
+      );
     for (const f of r.skipped) console.log(`kept existing ${f}`);
+    if (o.refreshDocs) {
+      if (r.conflicts.length) process.exitCode = 2;
+      return;
+    }
     const interactive = Boolean(process.stdin.isTTY);
     const next =
       "Next: npm install, then start your coding agent here and ask it to set up your Remote 3.";

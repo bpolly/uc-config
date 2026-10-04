@@ -1,5 +1,24 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+const MARKER = /^<!-- uc-config:generated v(\S+) sha256:([0-9a-f]{64}) -->\n/;
+/** Prefix generated docs with a marker so --refresh-docs can detect edits. */
+const stamp = (version: string, body: string) =>
+  `<!-- uc-config:generated v${version} sha256:${sha256(body)} -->\n${body}`;
+/** Exact output of releases that predate the marker (0.1.0, 0.2.0). */
+const LEGACY = new Set([
+  "053dd83c530adb91f58ad52148c9d858cc28864a137b7b5e65c4563338e91b4f",
+  "159e847a6a5b6c5cb9ed96f400e8f5d58cd9acae2e68bf666fc3fae2e4ad249b",
+  "d71e02c349b769c916d166a6b26cc14d80da4142042fa90564bda85c897a9b07",
+]);
+/** True when the file is unedited generated output from any uc-config version. */
+export function isPristine(content: string): boolean {
+  const m = MARKER.exec(content);
+  if (m) return sha256(content.slice(m[0].length)) === m[2];
+  return LEGACY.has(sha256(content));
+}
 
 const agents = (version: string) => `# Remote 3 configuration (uc-config)
 
@@ -56,8 +75,13 @@ the UC Integration Manager (http://<remote>:9999); run diagnose after any update
 
 ## Upgrading the tool
 
-\`npm update uc-config\`, then compile and plan. The plan must show 0 operations
-before you make any other change.
+1. \`npm install uc-config@latest\` (not \`npm update\`: it won't cross 0.x minor versions).
+2. \`npx uc-config init --refresh-docs\` to update this file and CLAUDE.md.
+   Files the user edited are kept; the new version is written beside them as \`.new\`.
+3. Read node_modules/uc-config/CHANGELOG.md for any "Action required" notes.
+4. \`npx uc-config compile && npx uc-config plan\`. It must show 0 operations
+   before you make any other change. If not, the upgrade changed how the config
+   is read: show the user the plan and don't apply it.
 `;
 
 // Claude Code reads CLAUDE.md, not AGENTS.md. Newer releases follow the
@@ -93,15 +117,43 @@ export interface InitResult {
   written: string[];
   skipped: string[];
   packageJsonUpdated: boolean;
+  /** Generated docs replaced by --refresh-docs. */
+  refreshed: string[];
+  /** Edited docs kept; the new version was written to `<name>.new`. */
+  conflicts: string[];
 }
 
 /** Scaffold a private config workspace. Never overwrites existing files. */
-export async function init(dir: string, version: string): Promise<InitResult> {
+export async function init(
+  dir: string,
+  version: string,
+  options: { refreshDocs?: boolean } = {},
+): Promise<InitResult> {
   await mkdir(dir, { recursive: true });
   const result: InitResult = {
     written: [],
     skipped: [],
     packageJsonUpdated: false,
+    refreshed: [],
+    conflicts: [],
+  };
+  const doc = async (name: string, contents: string) => {
+    let existing: string | undefined;
+    try {
+      existing = await readFile(join(dir, name), "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+    if (existing === undefined) return put(name, contents);
+    if (!options.refreshDocs || existing === contents)
+      return void result.skipped.push(name);
+    if (isPristine(existing)) {
+      await writeFile(join(dir, name), contents);
+      result.refreshed.push(name);
+    } else {
+      await writeFile(join(dir, `${name}.new`), contents);
+      result.conflicts.push(name);
+    }
   };
   const put = async (name: string, contents: string) => {
     try {
@@ -147,7 +199,7 @@ export async function init(dir: string, version: string): Promise<InitResult> {
   }
   await put("tsconfig.json", JSON.stringify(tsconfig, null, 2) + "\n");
   await put(".gitignore", gitignore);
-  await put("AGENTS.md", agents(version));
-  await put("CLAUDE.md", claude);
+  await doc("AGENTS.md", stamp(version, agents(version)));
+  await doc("CLAUDE.md", stamp(version, claude));
   return result;
 }

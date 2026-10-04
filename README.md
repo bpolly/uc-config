@@ -82,6 +82,23 @@ Ask your agent for changes in plain language, for example:
 The agent shows a plan of what will change before applying it. After you update
 an integration in the Integration Manager, ask the agent to run diagnostics.
 
+## Updating
+
+Ask your agent to "update uc-config", or run in your config folder:
+
+```sh
+npm install uc-config@latest
+npx uc-config init --refresh-docs     # refresh AGENTS.md / CLAUDE.md
+npx uc-config compile && npx uc-config plan    # must show 0 operations
+```
+
+Use `npm install uc-config@latest` rather than `npm update`: before 1.0,
+`npm update` doesn't move between minor versions (0.2 → 0.3). `--refresh-docs`
+keeps files you've edited and writes the new version beside them as `.new`.
+`doctor` tells you when a newer version is available. See
+[CHANGELOG.md](CHANGELOG.md) for what changed and whether a release needs any
+action.
+
 ## Requirements
 
 - Node.js 22+ and npm

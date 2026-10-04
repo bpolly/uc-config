@@ -12,6 +12,7 @@ the workspace's only target if exactly one is connected; otherwise `home`.
 | Command                                        | Writes to remote  | Purpose                                                                        |
 | ---------------------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
 | `init [--host ip] [--no-connect]`              | API key only      | Scaffold a workspace, then prompt for IP and PIN (connect + auth). Rerunnable. |
+| `init --refresh-docs`                          | no                | Update AGENTS.md/CLAUDE.md; edited files are kept and get a `.new` copy.       |
 | `connect <name> --host <url>`                  | no                | Record a target (identity, firmware). Rerun after firmware updates.            |
 | `auth`                                         | API key only      | Exchange the web-configurator PIN (`UC_PIN` or prompt) for an API key.         |
 | `doctor`                                       | no                | Verify identity and read access to every required endpoint.                    |
