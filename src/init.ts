@@ -73,6 +73,19 @@ Re-adding a dropped entity the integration still offers is safe to do
 directly. Ask before anything else. Integration installs and updates belong to
 the UC Integration Manager (http://<remote>:9999); run diagnose after any update.
 
+## Multiple remotes
+
+This folder manages exactly one remote (one target in \`.uc/targets/\`). For
+another remote, create a sibling folder and run \`npx uc-config init\` there.
+Never connect a second remote here, and never copy \`.uc/\` between folders.
+Shared pieces can be imported from a common .ts file, but entity IDs must come
+from each folder's own generated/devices.ts.
+
+## If the remote doesn't respond
+
+\`transport failed\` or timeouts usually mean the remote went to sleep. Ask the
+user to pick it up or dock it, then retry. Don't change the host.
+
 ## Upgrading the tool
 
 1. \`npm install uc-config@latest\` (not \`npm update\`: it won't cross 0.x minor versions).

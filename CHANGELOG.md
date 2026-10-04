@@ -9,6 +9,19 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.2.2
+
+Action required: optional. Run `npx uc-config init --refresh-docs` to get the
+new AGENTS.md sections.
+
+- Multiple remotes: documented as one folder per remote. `init` refuses to add
+  a second remote to a folder, and commands that can't pick a target list the
+  targets the folder has.
+- `init` ends by suggesting the prompt "Set up my Remote 3" (the address is
+  already saved).
+- Docs: dock or wake the remote during setup; AGENTS.md says what to do when the
+  remote stops responding.
+
 ## 0.2.1
 
 Action required: run `npx uc-config init --refresh-docs`. It updates the

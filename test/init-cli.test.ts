@@ -2,7 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, access } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  access,
+  mkdir,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { FakeRemote } from "./helpers.js";
@@ -97,6 +104,41 @@ test("init reports an unreachable remote and keeps the files", async () => {
     assert.equal(r.code, 1);
     assert.match(r.output, /Could not reach a Remote 3/);
     await access(join(ws, "package.json"));
+  } finally {
+    await rm(ws, { recursive: true, force: true });
+  }
+});
+
+test("init refuses a second remote; commands list targets when ambiguous", async () => {
+  const ws = await mkdtemp(join(tmpdir(), "uc-init-cli-"));
+  try {
+    await mkdir(join(ws, ".uc/targets"), { recursive: true });
+    const t = {
+      host: "http://127.0.0.1:9",
+      identity: "aa",
+      version: {},
+      tokenEnv: "UC_API_KEY",
+    };
+    await writeFile(join(ws, ".uc/targets/den.json"), JSON.stringify(t));
+    const second = await run(ws, [
+      "init",
+      "--target",
+      "bedroom",
+      "--host",
+      "http://127.0.0.1:9",
+    ]);
+    assert.equal(second.code, 1);
+    assert.match(
+      second.output,
+      /already manages den\. Use one folder per remote/,
+    );
+    await writeFile(
+      join(ws, ".uc/targets/attic.json"),
+      JSON.stringify({ ...t, identity: "bb" }),
+    );
+    const doctor = await run(ws, ["doctor"]);
+    assert.notEqual(doctor.code, 0);
+    assert.match(doctor.output, /It has: attic, den\. Pass --target/);
   } finally {
     await rm(ws, { recursive: true, force: true });
   }

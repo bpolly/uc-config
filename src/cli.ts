@@ -33,20 +33,25 @@ const program = new Command()
   )
   .version(pkgVersion)
   .option("--workspace <path>", "project directory", process.cwd());
+function workspaceTargets(dir?: string): string[] {
+  if (!dir) {
+    const ws = process.argv.indexOf("--workspace");
+    dir = resolve(ws > 0 ? process.argv[ws + 1]! : process.cwd());
+  }
+  try {
+    return readdirSync(join(dir, ".uc", "targets"))
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => f.slice(0, -5))
+      .sort();
+  } catch {
+    return []; // no targets yet
+  }
+}
 // UC_TARGET, else the workspace's only target, else "home".
 function implicitTarget(): string {
   if (process.env.UC_TARGET) return process.env.UC_TARGET;
-  const ws = process.argv.indexOf("--workspace");
-  const dir = resolve(ws > 0 ? process.argv[ws + 1]! : process.cwd());
-  try {
-    const names = readdirSync(join(dir, ".uc", "targets"))
-      .filter((f) => f.endsWith(".json"))
-      .map((f) => f.slice(0, -5));
-    if (names.length === 1) return names[0]!;
-  } catch {
-    // no targets yet
-  }
-  return "home";
+  const names = workspaceTargets();
+  return names.length === 1 ? names[0]! : "home";
 }
 const defaultTarget = implicitTarget();
 const root = () => resolve(program.opts().workspace);
@@ -64,10 +69,14 @@ async function load(name: string) {
   try {
     target = await readJson<Target>(targetFile(name));
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT")
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      const names = workspaceTargets(root());
       throw new Error(
-        `No target "${name}" in this workspace. Run: uc-config connect ${name} --host http://<REMOTE_IP>`,
+        names.length
+          ? `No target "${name}" in this workspace. It has: ${names.join(", ")}. Pass --target <name> or set UC_TARGET.`
+          : `No target "${name}" in this workspace. Run: uc-config connect ${name} --host http://<REMOTE_IP>`,
       );
+    }
     throw e;
   }
   let token = process.env[target.tokenEnv];
@@ -160,7 +169,7 @@ async function connectTarget(
     const old = await readJson<Target>(targetFile(name));
     if (old.identity !== target.identity)
       throw new Error(
-        "Target name already refers to another remote; use a new name",
+        "This folder is already connected to a different remote. Use one folder per remote (mkdir ../other-remote && cd ../other-remote && npx uc-config init).",
       );
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
@@ -650,7 +659,10 @@ program
     "Scaffold a private config workspace (package.json, tsconfig, .gitignore, AGENTS.md)",
   )
   .option("--host <ip>", "remote IP address (skips the prompt)")
-  .option("--target <name>", "target name", "home")
+  .option(
+    "--target <name>",
+    "target name (default: the folder's existing target, else home)",
+  )
   .option("--no-connect", "only create files; don't connect or authenticate")
   .option(
     "--refresh-docs",
@@ -672,14 +684,28 @@ program
     }
     const interactive = Boolean(process.stdin.isTTY);
     const next =
-      "Next: npm install, then start your coding agent here and ask it to set up your Remote 3.";
+      'Next: npm install, then start your coding agent here and ask it to "Set up my Remote 3".';
     if (!o.connect) return console.log(next);
-    const name: string = o.target;
+    const existing = workspaceTargets(root());
+    const name: string =
+      o.target ?? (existing.length === 1 ? existing[0]! : "home");
+    if (existing.length && !existing.includes(name)) {
+      console.log(
+        `This folder already manages ${existing.join(", ")}. Use one folder per remote:\n` +
+          "  mkdir ../other-remote && cd ../other-remote && npx uc-config init",
+      );
+      process.exitCode = 1;
+      return;
+    }
     // 1. Connect (unless already connected).
     let target: Target | undefined;
     try {
       target = await readJson<Target>(targetFile(name));
       console.log(`Already connected to ${target.host} as "${name}".`);
+      if (o.host)
+        console.log(
+          `Ignoring --host: this folder already manages "${name}". For another remote, use a new folder.`,
+        );
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     }

@@ -24,7 +24,12 @@ hardware. Humans can use it directly too.
 - On the remote, enable the web configurator: **Settings → Profile → Web
   configurator**. Note the **PIN** it shows.
 - Find the remote's **IP address**. It's shown in the remote's network
-  settings, or in your router's device list. The computer you use must be on the same network as the remote.
+  settings, or in your router's device list. The computer you use must be on
+  the same network as the remote.
+- **Dock the remote** (or keep picking it up) during setup. It doesn't need the
+  dock to work, but it goes to sleep when idle and drops off Wi-Fi, which
+  interrupts setup. The Integration Manager's web page is also only available
+  while docked.
 
 ### 2. Create your config folder
 
@@ -51,7 +56,10 @@ repo.
 Start your coding agent (Claude Code, Codex, Cursor, etc.) in that folder and
 prompt:
 
-> Set up my Remote 3 at `<IP>`
+> Set up my Remote 3
+
+`init` already saved the remote's address, so you don't need to repeat it. (If
+you skipped the IP prompt, include it: "Set up my Remote 3 at 192.168.1.50".)
 
 The agent imports your current setup into `remote.config.ts` and records which
 resources it manages. This writes nothing to the remote.
@@ -81,6 +89,24 @@ Ask your agent for changes in plain language, for example:
 
 The agent shows a plan of what will change before applying it. After you update
 an integration in the Integration Manager, ask the agent to run diagnostics.
+
+## Multiple remotes
+
+Use **one folder per remote**:
+
+```sh
+mkdir -p remotes/living-room && cd remotes/living-room && npx uc-config init
+mkdir -p remotes/bedroom && cd remotes/bedroom && npx uc-config init
+```
+
+Each folder has its own `remote.config.ts`, state and API key, and an agent
+working in one folder can't touch the other remote. The folders can share one
+private git repo. Two remotes rarely have identical configs, because entity IDs
+include each remote's integration IDs; to share a macro or layout, put it in a
+common `.ts` file and import it, using each folder's own `generated/devices.ts`
+for the IDs.
+
+`init` refuses to add a second remote to a folder that already has one.
 
 ## Updating
 
