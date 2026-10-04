@@ -231,3 +231,35 @@ test("command parameters must match metadata constraints", () => {
     /Unknown parameter/,
   );
 });
+test("selection parameters are enforced only when the entity publishes a list", () => {
+  const metadata = {
+    params: [
+      {
+        param: "source",
+        type: "selection",
+        items: { source: "attributes", field: "source_list" },
+      },
+    ],
+  };
+  const cmd = (source: unknown) => ({
+    cmd_id: "media_player.select_source",
+    params: { source },
+  });
+  const listed = { attributes: { source_list: ["HDMI_1", "HDMI_2"] } };
+  validateCommandParameters(cmd("HDMI_1"), metadata, listed);
+  assert.throws(
+    () => validateCommandParameters(cmd("HDMI_9"), metadata, listed),
+    /Invalid parameter/,
+  );
+  const unlisted = { attributes: { source: "tv" } };
+  validateCommandParameters(cmd("input-selector tv"), metadata, unlisted);
+  validateCommandParameters(cmd("input-selector tv"), metadata, {});
+  assert.throws(
+    () => validateCommandParameters(cmd(""), metadata, unlisted),
+    /Invalid parameter/,
+  );
+  assert.throws(
+    () => validateCommandParameters(cmd(42), metadata, unlisted),
+    /Invalid parameter/,
+  );
+});

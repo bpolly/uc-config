@@ -138,6 +138,12 @@ sequences: {
 
 `select_source` values are entity-specific. Copy them from an existing sequence
 or the entity's `attributes.source_list` (`npm run uc -- api GET /entities/<id>`).
+When the entity publishes a `source_list`, the planner rejects values outside it.
+Some drivers publish none and accept free text instead; the planner then accepts
+any non-empty string, so take the value from the driver's documentation. For
+example, the Onkyo/Pioneer/Integra eISCP driver takes `input-selector <name>`
+(`input-selector tv`, `input-selector bd`, `input-selector game`; see its
+[text commands](https://github.com/EddyMcNut/uc-intg-onkyo-avr/blob/main/docs/cheats.md#text-commands)).
 
 ## Create a new activity
 

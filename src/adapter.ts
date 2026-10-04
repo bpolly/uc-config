@@ -598,7 +598,12 @@ export function validateCommandParameters(
       const choices = isObject(source)
         ? source[String(p.items.field)]
         : undefined;
-      valid = Array.isArray(choices) && choices.includes(value);
+      // Some drivers (e.g. Onkyo eISCP) publish no list at all and accept free
+      // text such as "input-selector tv". With no list there is nothing to check
+      // against, so accept any non-empty string; a published list is enforced.
+      valid = Array.isArray(choices)
+        ? choices.includes(value)
+        : typeof value === "string" && value.trim() !== "";
     } else throw new Error(`Unsupported parameter metadata for ${key}`);
     if (!valid)
       throw new Error(`Invalid parameter ${key} for ${command.cmd_id}`);

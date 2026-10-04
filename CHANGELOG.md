@@ -9,6 +9,15 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.2.5
+
+Action required: none.
+
+- `plan` no longer rejects a `select_source` value on entities that publish no
+  `source_list` (e.g. the Onkyo/Pioneer/Integra eISCP driver, which takes free
+  text like `input-selector tv`). Any non-empty string is accepted there; a
+  published list is still enforced.
+
 ## 0.2.4
 
 Action required: none. Existing configs keep their keys.
