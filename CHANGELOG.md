@@ -9,6 +9,22 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.3.2
+
+Action required: optional, run `npx uc-config init --refresh-docs`. Backups
+made with 0.3.1 are zip files saved as `.tar`; rename them to `.zip`.
+
+- `backup` detects the archive type from its contents. The remote sends no
+  filename and the archive is a zip, so 0.3.1 saved it with a `.tar` extension.
+- `backup` also saves the UC Integration Manager's export beside the archive
+  (`<name>-intg-manager.json`). The native backup doesn't hold the setup of
+  community integrations (Onkyo, Oppo, Kaleidescape, ...); the manager's export
+  does. Default `http://<remote>:9999`; `--intg-manager <url>` sets and
+  remembers another address; `--no-intg-manager` skips it. A missing manager
+  never fails the backup.
+- Docs and AGENTS.md no longer claim the native backup covers all integration
+  settings.
+
 ## 0.3.1
 
 Action required: optional, run `npx uc-config init --refresh-docs` to get the

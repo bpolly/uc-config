@@ -161,6 +161,17 @@ export function redact(value: unknown): unknown {
     ]),
   );
 }
+/** Archive type from its magic bytes; the remote may not send a filename. */
+export function archiveExtension(bytes: Uint8Array, filename?: string): string {
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return ".zip";
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) return ".tar.gz";
+  if (
+    bytes.length > 262 &&
+    String.fromCharCode(...bytes.slice(257, 262)) === "ustar"
+  )
+    return ".tar";
+  return /\.(tar\.gz|tgz|tar|zip)$/i.exec(filename ?? "")?.[0] ?? ".bin";
+}
 export function secretFields(v: unknown, path: string[] = []): string[] {
   if (!isObject(v) && !Array.isArray(v)) return [];
   if (isObject(v) && "$secret" in v) return [];

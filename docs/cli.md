@@ -30,7 +30,7 @@ the workspace's only target if exactly one is connected; otherwise `home`.
 | `ir learn/capture <emitterId>`                 | yes               | Learn IR codes from a physical remote.                                         |
 | `state adopt <key> <id>` / `forget` / `move`   | no                | Edit local ownership bindings.                                                 |
 | `rollback [--out f]`                           | no                | Build a compensating plan from the last journal.                               |
-| `backup [--out f] [--list]`                    | stops intgs       | Full native backup to `backups/<timestamp>`; keeps older ones. Ask first.      |
+| `backup [--out f] [--list] [--intg-manager u]` | stops intgs       | Native backup + Integration Manager export to `backups/`; keeps old ones.      |
 | `api <METHOD> <path> [--data json] [--write]`  | only with --write | Raw authenticated Core API call; output redacted.                              |
 
 Exit codes: `0` ok, `1` error, `2` drift/conflicts/deferred/diagnose findings,

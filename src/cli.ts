@@ -8,7 +8,7 @@ import {
   formatSync,
   remoteGone,
 } from "./sync.js";
-import { resolve, join } from "node:path";
+import { resolve, join, relative } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 import { ApiError, CoreClient, resolveSecrets } from "./client.js";
@@ -24,7 +24,14 @@ import {
   type State,
   type Target,
 } from "./model.js";
-import { readJson, saveJson, redact, withLock, isObject } from "./util.js";
+import {
+  readJson,
+  saveJson,
+  redact,
+  withLock,
+  isObject,
+  archiveExtension,
+} from "./util.js";
 import { rollbackPlan } from "./recovery.js";
 import { validateRequest } from "./schema.js";
 import { diagnose, formatDiagnosis } from "./diagnose.js";
@@ -289,7 +296,9 @@ program
         process.exitCode = 1;
       }
     }
-    const backups = listBackups(root());
+    const backups = listBackups(root()).filter(
+      (b) => !b.file.endsWith("-intg-manager.json"),
+    );
     console.log(
       backups.length
         ? `Full backups: ${backups.length} (latest ${backups.at(-1)!.file})`
@@ -711,6 +720,11 @@ program
   .option("--target <name>", "target", defaultTarget)
   .option("--out <file>", "archive path (default: backups/<timestamp>)")
   .option("--list", "list existing backups; no remote access")
+  .option(
+    "--intg-manager <url>",
+    "Integration Manager base URL (remembered); default http://<remote>:9999",
+  )
+  .option("--no-intg-manager", "skip the Integration Manager backup")
   .action(async (o) => {
     if (o.list) {
       const list = listBackups(root());
@@ -730,8 +744,7 @@ program
       const { bytes, filename } = await client.downloadFile(
         "/system/backup/export",
       );
-      const ext =
-        /\.(tar\.gz|tgz|tar|zip)$/i.exec(filename ?? "")?.[0] ?? ".tar";
+      const ext = archiveExtension(bytes, filename);
       const stamp = new Date()
         .toISOString()
         .replace(/:/g, "")
@@ -754,8 +767,51 @@ program
       console.log(
         `Backup saved to ${out} (${formatSize(bytes.length)}). It is unencrypted and contains integration credentials: keep it private. Restore it from the web configurator.`,
       );
+      if (o.intgManager === false) return;
+      // Community integrations keep their setup data outside the native backup;
+      // the Integration Manager's export is what holds it.
+      const saved = local("intg-manager.json");
+      if (typeof o.intgManager === "string")
+        await saveJson(saved, { url: new URL(o.intgManager).origin });
+      let base = `${new URL(target.host).protocol}//${new URL(target.host).hostname}:9999`;
+      try {
+        base = (await readJson<{ url: string }>(saved)).url;
+      } catch {
+        /* default */
+      }
+      const companion =
+        file.replace(/(\.tar\.gz|\.[a-z0-9]+)$/i, "") + "-intg-manager.json";
+      try {
+        const res = await fetch(`${base}/api/v1/backups/export`, {
+          signal: AbortSignal.timeout(60000),
+          redirect: "error",
+        });
+        const body = await res.text();
+        const json = res.ok ? (JSON.parse(body) as unknown) : undefined;
+        if (!isObject(json) || !isObject(json.remotes))
+          throw new Error(`HTTP ${res.status}, not a manager backup`);
+        if (
+          !Object.keys(json.remotes).some(
+            (k) =>
+              k.replace(/_/g, ":").toUpperCase() ===
+              target.identity.toUpperCase(),
+          )
+        )
+          console.log(
+            "Note: the Integration Manager backup has no entry for this remote.",
+          );
+        await writeFile(companion, body, { mode: 0o600, flag: "wx" });
+        console.log(
+          `Integration Manager backup saved to ${relative(root(), companion)} (community integration settings; restore it in the Integration Manager).`,
+        );
+      } catch (e) {
+        console.log(
+          `No Integration Manager backup (${base}: ${(e as Error).message}). If you use community integrations and the manager runs elsewhere, rerun with --intg-manager http://<host>:9999.`,
+        );
+      }
     });
   });
+
 const BACKUP_DIR = "backups";
 function formatSize(n: number): string {
   return n > 1048576
@@ -766,7 +822,9 @@ function listBackups(dir: string): Array<{ file: string; size: string }> {
   try {
     const d = join(dir, BACKUP_DIR);
     return readdirSync(d)
-      .filter((f) => /\.(tar\.gz|tgz|tar|zip)$/i.test(f))
+      .filter((f) =>
+        /\.(tar\.gz|tgz|tar|zip|bin)$|-intg-manager\.json$/i.test(f),
+      )
       .sort()
       .map((f) => ({
         file: join(BACKUP_DIR, f),

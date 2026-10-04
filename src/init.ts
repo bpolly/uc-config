@@ -80,9 +80,17 @@ The remote is the source of truth; this folder is a working copy of it.
 ## Full backup
 
 \`npx uc-config backup\` saves the remote's own full backup (the same archive
-as the web configurator's backup page) to \`backups/<model>-<timestamp>.tar\`.
-It covers activities, macros, pages, integrations and their settings, icons
-and IR codes, and is what you restore after a factory reset.
+as the web configurator's backup page) to \`backups/<model>-<timestamp>.zip\`.
+It covers activities, macros, pages, profiles, icons, IR codes and the
+built-in integrations' settings, and is what you restore after a factory reset.
+
+It does **not** hold the setup of community integrations installed through the
+UC Integration Manager. When the manager is reachable (default
+\`http://<remote>:9999\`; pass \`--intg-manager <url>\` once if it runs
+elsewhere), \`backup\` also saves its export beside the archive as
+\`<name>-intg-manager.json\`. If it reports no manager backup and the user has
+community integrations, tell them those integrations would need setting up
+again after a restore.
 
 - Whenever you work in this folder and \`backup --list\` (or \`doctor\`) shows
   no backup, ask the user once whether they'd like one now.
@@ -92,8 +100,9 @@ and IR codes, and is what you restore after a factory reset.
   Only delete old ones when the user asks.
 - Archives are unencrypted and contain integration credentials. backups/ is
   gitignored: never commit, upload or print them.
-- Restoring replaces the remote's configuration: the user does that in the web
-  configurator. Never restore from here.
+- Restoring replaces the remote's configuration: the user restores the archive
+  in the web configurator, then the manager file in the Integration Manager.
+  Never restore from here.
 
 ## When something is broken
 

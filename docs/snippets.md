@@ -320,13 +320,23 @@ npm run uc -- apply .uc/rollback.json
 
 ```sh
 npx uc-config backup --list   # existing backups (no remote access)
-npx uc-config backup          # new backups/<model>-<timestamp>.tar
+npx uc-config backup          # new backups/<model>-<timestamp>.zip
 ```
 
 This is the remote's own full backup, the same archive the web configurator
-downloads: activities, macros, pages, integrations and their settings, icons
-and IR codes. Each run adds a file and keeps the older ones. `--out <path>`
-saves somewhere else.
+downloads: activities, macros, pages, profiles, icons, IR codes and the
+built-in integrations' settings. Each run adds a file and keeps the older ones.
+`--out <path>` saves somewhere else.
+
+**Community integrations** (installed through the UC Integration Manager, e.g.
+Onkyo, Oppo, Kaleidescape, Lutron) keep their setup data outside this archive.
+`backup` therefore also downloads the manager's export
+(`/api/v1/backups/export`) and saves it beside the archive as
+`<name>-intg-manager.json`. It tries `http://<remote>:9999` by default; if the
+manager runs elsewhere (Docker, another host), pass
+`--intg-manager http://<host>:9999` once and it is remembered.
+`--no-intg-manager` skips it. If the manager can't be reached, the native
+backup is still saved and the command says so.
 
 - It **stops integrations and docks for a few seconds**. Ask the user first,
   and don't schedule it.
@@ -334,7 +344,8 @@ saves somewhere else.
   `backups/` is gitignored (and gets its own `.gitignore`); keep it private.
 - It does not include Wi-Fi settings, the admin or web-configurator PIN, or
   API keys, so `npx uc-config auth` is needed again after a restore.
-- Restore it in the web configurator. uc-config never restores.
+- Restore the archive in the web configurator, then the `-intg-manager.json`
+  file in the Integration Manager. uc-config never restores.
 
 ## Nightly health check (for an agent cron job)
 
