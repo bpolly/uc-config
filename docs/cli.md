@@ -19,6 +19,7 @@ the workspace's only target if exactly one is connected; otherwise `home`.
 | `diagnose [--json]`                            | no                | Orphaned entity references, disconnected integrations, suggested fixes.        |
 | `inventory [--out f] [--bindings f.ts]`        | no                | Raw (redacted) remote state; optional typed entity/command bindings.           |
 | `import [--out f.ts]`                          | no                | Generate editable config from the live remote. Never overwrites.               |
+| `sync [--dry-run]`                             | no                | Pull the live remote into source, state and bindings; keeps local edits.       |
 | `compile [--config f] [--out f]`               | no                | Evaluate TS config into `.uc/build.json`. Offline.                             |
 | `plan [--out f] [--prune] [--overwrite-drift]` | no                | Three-way diff: source vs last-applied vs live.                                |
 | `apply <plan> [--adopt-only]`                  | yes               | Execute a saved plan after re-verifying preconditions.                         |

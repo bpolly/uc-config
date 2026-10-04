@@ -42,19 +42,28 @@ exists, and skip steps that are done:
    enabled on the remote). Never ask for the PIN in chat, and never run \`auth\`
    yourself; it needs a real terminal.
 3. \`npx uc-config doctor\`
-4. \`npx uc-config inventory --bindings generated/devices.ts\`
-5. \`npx uc-config import --out remote.config.ts\`
-6. \`npx uc-config compile && npx uc-config plan --out .uc/plan.json\`. Expect only \`= adopt\` operations.
-7. \`npx uc-config apply .uc/plan.json --adopt-only && npx uc-config check\`
-8. \`git init && git add -A && git commit -m "Import Remote 3 config"\`
+4. \`npx uc-config sync\`. With no remote.config.ts yet, it imports the remote,
+   writes remote.config.ts and generated/devices.ts, and adopts everything. It
+   never writes to the remote.
+5. \`npx uc-config compile && npx uc-config check\` (must be 0 operations).
+6. \`git init && git add -A && git commit -m "Import Remote 3 config"\`
 
-If \`.uc/\` already exists, reuse it. Don't re-auth, re-import or re-adopt.
+If \`.uc/\` already exists, reuse it. Don't re-auth. If remote.config.ts or
+\`.uc/state\` is lost, the remote still has everything: run sync again.
 
 ## Every change
 
-Edit remote.config.ts, then: \`npx tsc --noEmit\`, \`npx uc-config compile\`,
-\`npx uc-config plan --out .uc/plan.json\`, review, \`npx uc-config apply .uc/plan.json\`,
-\`npx uc-config check\` (must be 0 operations).
+The remote is the source of truth; this folder is a working copy of it.
+
+1. \`npx uc-config sync\` first. It pulls edits made on the remote (web
+   configurator, driver updates) into remote.config.ts and refreshes
+   generated/devices.ts, keeping any unapplied local edits. If it reports a
+   conflict (\`!\`), stop and ask the user which value to keep.
+2. Edit remote.config.ts.
+3. \`npx tsc --noEmit\`, \`npx uc-config compile\`,
+   \`npx uc-config plan --out .uc/plan.json\`, review,
+   \`npx uc-config apply .uc/plan.json\`, \`npx uc-config check\` (must be 0 operations).
+4. Commit, so git keeps a history of what changed.
 
 - Use only entity IDs and cmd_ids from generated/devices.ts or a fresh inventory.
   Never invent command names.

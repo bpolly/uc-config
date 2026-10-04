@@ -277,15 +277,36 @@ npm run uc -- apply .uc/plan.json --adopt-only
 ## Pull changes made in the web configurator
 
 ```sh
-npm run uc -- import --out .uc/imported-$(date +%F).config.ts
-npm run uc -- compile --config .uc/imported-$(date +%F).config.ts --out .uc/imported-build.json
+npx uc-config sync --dry-run   # what would change; writes nothing
+npx uc-config sync             # update remote.config.ts, generated/devices.ts and state
+```
+
+`sync` never writes to the remote. Per resource it prints:
+
+| Mark | Meaning                                        | What sync does                                 |
+| ---- | ---------------------------------------------- | ---------------------------------------------- |
+| `<`  | changed on the remote only                     | copies the live value into source and state    |
+| `+`  | exists only on the remote                      | adds it to source and adopts it                |
+| `-`  | deleted on the remote (confirmed by a re-read) | removes it (and its pages/buttons) from source |
+| `~`  | unapplied local edit, remote unchanged         | keeps it; the next plan applies it             |
+| `=`  | local edit already live                        | updates state                                  |
+| `!`  | changed both locally and on the remote         | touches nothing; exit 2. Pick a value by hand  |
+
+Resources are matched by kind and native id, so keys you renamed are kept. Run
+it before every change; afterwards `plan` contains only your own edits.
+
+`sync` rewrites `remote.config.ts`, so it only runs on the plain form that
+`import`/`sync` write. If you converted the file to helpers or added code, sync
+refuses. Then pull by hand:
+
+```sh
+npx uc-config import --out .uc/imported-$(date +%F).config.ts
+npx uc-config compile --config .uc/imported-$(date +%F).config.ts --out .uc/imported-build.json
 diff <(jq -S . .uc/build.json) <(jq -S . .uc/imported-build.json) | less
 ```
 
-Imported keys come from display names (`activity.watch_tv`), so they usually
-match yours, but a renamed activity gets a different key. Match resources by
-`kind` + `id` and copy the changed fields into `remote.config.ts`. Then `plan` should report
-0 operations.
+Match resources by `kind` + `id`, copy the changed fields into
+`remote.config.ts`, and `plan` should report 0 operations.
 
 ## Undo the last apply
 

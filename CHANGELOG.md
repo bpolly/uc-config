@@ -9,6 +9,22 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.3.0
+
+Action required: run `npx uc-config init --refresh-docs`. The agent
+instructions now start every change with `sync`.
+
+- New `sync` command: pulls the live remote into `remote.config.ts`, local
+  state and `generated/devices.ts` in one step, with a three-way merge. Remote
+  edits are pulled, unapplied local edits are kept, edits on both sides are
+  reported as conflicts and left alone. Remote-only resources are added and
+  remote deletions (confirmed by a direct re-read) are removed. Never writes to
+  the remote. `--dry-run` reports without writing.
+- On a folder with no `remote.config.ts`, `sync` does the whole first import:
+  import, bindings and adoption. Setup is now `init`, `sync`, `check`.
+- `sync` only rewrites the plain form that `import` writes. A config using
+  helpers or code is refused with a pointer to the manual steps.
+
 ## 0.2.5
 
 Action required: none.

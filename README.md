@@ -162,21 +162,17 @@ npm run uc -- auth
 # 4. Verify connectivity and API coverage
 npm run uc -- doctor
 
-# 5. Snapshot what is on the remote
-npm run uc -- inventory --bindings generated/devices.ts   # entity IDs + commands
-npm run uc -- import --out remote.config.ts               # editable config
-npm run uc -- diagnose                                    # health check
+# 5. Import and take ownership (local only; writes nothing to the remote).
+#    Writes remote.config.ts and generated/devices.ts, and adopts everything.
+npm run uc -- sync
+npm run uc -- diagnose                        # health check
 
-# 6. Take ownership (local only; writes nothing to the remote)
+# 6. Confirm convergence
 npm run uc -- compile
-npm run uc -- plan --out .uc/plan.json        # expect only "= adopt" operations
-npm run uc -- apply .uc/plan.json --adopt-only
-
-# 7. Confirm convergence
 npm run uc -- check                           # 0 operations, 0 conflicts
 ```
 
-After step 7 the workspace is ready. Every later change follows the edit loop below.
+After step 6 the workspace is ready. Every later change follows the edit loop below.
 
 Notes for agents:
 
@@ -194,7 +190,11 @@ Notes for agents:
 
 ## The edit loop
 
+The remote is the source of truth and this folder is a working copy, so pull
+first: `sync` brings in anything changed on the remote since the last run.
+
 ```sh
+npm run uc -- sync              # pull remote edits; keeps your unapplied edits
 # edit remote.config.ts
 npm run check:examples          # typecheck config + examples
 npm run uc -- compile           # evaluate TS -> .uc/build.json (offline)
@@ -210,7 +210,7 @@ needs no apply. See [docs/snippets.md](docs/snippets.md) for common edits.
 
 **If the plan touches things you didn't edit, stop.** Those operations are
 earlier source changes that were never applied, or edits made on the remote
-since. Don't apply them along with your change: sync with the live remote first
+since. Don't apply them along with your change: run `sync` first
 (see [Pull changes made in the web configurator](docs/snippets.md#pull-changes-made-in-the-web-configurator)),
 then replan until only your change is left.
 
@@ -307,8 +307,9 @@ with `npx uc-config init` (see [Quick start](#quick-start)), in a **private**
 git repo. `init` gitignores `.uc/`, which holds credentials.
 
 Alternatively, use `--workspace <dir>` to point the CLI at any directory holding
-`remote.config.ts` and `.uc/`. Back up `.uc/state` and `.uc/journals`
-privately; losing them makes the next plan an adoption pass.
+`remote.config.ts` and `.uc/`. Nothing here is irreplaceable: the remote holds
+the configuration, and if `.uc/state` or `remote.config.ts` is lost, `sync`
+rebuilds both from it. Git is useful as a history of changes, not as a backup.
 
 ## Reference
 

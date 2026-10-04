@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, readFile, rename } from "node:fs/promises";
+import {
+  syncConfig,
+  parseSource,
+  renderSource,
+  formatSync,
+  remoteGone,
+} from "./sync.js";
 import { resolve, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
@@ -318,6 +325,92 @@ program
     console.log(
       `Wrote ${o.out}; no ownership or remote changes.\n${warnings.map((w) => `- ${w}`).join("\n")}`,
     );
+  });
+program
+  .command("sync")
+  .description(
+    "Pull the live remote into remote.config.ts and state; keeps unapplied local edits. Never writes to the remote.",
+  )
+  .option("--target <name>", "target", defaultTarget)
+  .option("--config <file>", "TypeScript source", "remote.config.ts")
+  .option(
+    "--bindings <file>",
+    "device bindings to refresh",
+    "generated/devices.ts",
+  )
+  .option("--dry-run", "report what would change without writing files")
+  .action(async (o) => {
+    await withLock(local(`locks/${targetName(o.target)}.lock`), async () => {
+      const { target, client, state, adapter } = await load(o.target);
+      await client.verifyTarget(target);
+      if (state.identity !== target.identity)
+        throw new Error("State belongs to a different remote");
+      try {
+        const journal = await readJson<Journal>(journalFile(o.target));
+        if (journal.status === "failed" || journal.status === "running")
+          throw new Error(
+            "Previous apply is unresolved; run resume before syncing",
+          );
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+      const file = resolve(root(), o.config);
+      let text: string | undefined;
+      try {
+        text = await readFile(file, "utf8");
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+      // First run: no config yet. Import and adopt everything as it is.
+      if (text === undefined && Object.keys(state.bindings).length)
+        throw new Error(
+          `${o.config} is missing but local state still manages ${Object.keys(state.bindings).length} resources. Restore the file (e.g. from git) rather than re-importing.`,
+        );
+      const source =
+        text === undefined
+          ? ({ schemaVersion: 1, resources: {} } as Config)
+          : parseSource(text);
+      if (!source)
+        throw new Error(
+          `${o.config} isn't in the plain form import writes (it uses helpers or code), so sync can't rewrite it without losing that. Use the manual steps in docs/snippets.md ("Pull changes made in the web configurator").`,
+        );
+      validateConfig(source);
+      const inv = await inventory(client);
+      const { config: live } = await importConfig(client);
+      const result = await syncConfig(
+        source,
+        state,
+        live,
+        remoteGone(adapter, state),
+      );
+      validateConfig(result.config);
+      const firstRun = text === undefined;
+      console.log(
+        firstRun
+          ? `Imported and adopted ${result.changes.length} resources from the remote.`
+          : formatSync(result.changes),
+      );
+      const conflicts = result.changes.some((c) => c.action === "conflict");
+      if (conflicts) process.exitCode = 2;
+      if (o.dryRun) return console.log("Dry run: no files written.");
+      const touched = result.changes.some((c) =>
+        ["pull", "add", "remove", "applied"].includes(c.action),
+      );
+      if (touched) {
+        const tmp = `${file}.sync.tmp`;
+        await writeFile(tmp, renderSource(result.config), { mode: 0o600 });
+        await saveJson(stateFile(o.target), result.state);
+        await rename(tmp, file);
+      }
+      const bindings = resolve(root(), o.bindings);
+      await mkdir(resolve(bindings, ".."), { recursive: true });
+      await writeFile(bindings, generateBindings(inv));
+      console.log(
+        touched
+          ? `Updated ${o.config}, ${o.bindings} and local state. No remote changes. Next: compile, then plan should show only your own edits.`
+          : `${o.config} already matches the remote. Refreshed ${o.bindings}.`,
+      );
+    });
   });
 program
   .command("compile")
