@@ -4,13 +4,14 @@ Run as `npm run uc -- <command>` inside this repo, or `npx uc-config <command>`
 when installed as a dependency. Global option: `--workspace <dir>` (directory
 holding `remote.config.ts` and `.uc/`; default: current directory).
 
-Most commands take `--target <name>`. The default is `$UC_TARGET`, or
-`living-room` if that is unset.
+Most commands take `--target <name>`. The default is `$UC_TARGET`; otherwise
+the workspace's only target if exactly one is connected; otherwise `home`.
 
 ## Commands
 
 | Command                                        | Writes to remote  | Purpose                                                                 |
 | ---------------------------------------------- | ----------------- | ----------------------------------------------------------------------- |
+| `init`                                         | no                | Scaffold a private config workspace. Never overwrites files.            |
 | `connect <name> --host <url>`                  | no                | Record a target (identity, firmware). Rerun after firmware updates.     |
 | `auth`                                         | API key only      | Exchange the web-configurator PIN (`UC_PIN` or prompt) for an API key.  |
 | `doctor`                                       | no                | Verify identity and read access to every required endpoint.             |

@@ -21,14 +21,34 @@ import { readJson, saveJson, redact, withLock, isObject } from "./util.js";
 import { rollbackPlan } from "./recovery.js";
 import { validateRequest } from "./schema.js";
 import { diagnose, formatDiagnosis } from "./diagnose.js";
+import { init } from "./init.js";
+import { readFileSync, readdirSync } from "node:fs";
+const pkgVersion: string = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
 const program = new Command()
   .name("uc-config")
   .description(
     "TypeScript configuration and provisioning for Unfolded Circle Remote 3",
   )
-  .version("0.1.0")
+  .version(pkgVersion)
   .option("--workspace <path>", "project directory", process.cwd());
-const defaultTarget = process.env.UC_TARGET ?? "living-room";
+// UC_TARGET, else the workspace's only target, else "home".
+function implicitTarget(): string {
+  if (process.env.UC_TARGET) return process.env.UC_TARGET;
+  const ws = process.argv.indexOf("--workspace");
+  const dir = resolve(ws > 0 ? process.argv[ws + 1]! : process.cwd());
+  try {
+    const names = readdirSync(join(dir, ".uc", "targets"))
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => f.slice(0, -5));
+    if (names.length === 1) return names[0]!;
+  } catch {
+    // no targets yet
+  }
+  return "home";
+}
+const defaultTarget = implicitTarget();
 const root = () => resolve(program.opts().workspace);
 const local = (name: string) => join(root(), ".uc", name);
 const targetName = (name: string) => {
@@ -40,7 +60,16 @@ const stateFile = (name: string) => local(`state/${targetName(name)}.json`);
 const journalFile = (name: string) =>
   local(`journals/${targetName(name)}.json`);
 async function load(name: string) {
-  const target = await readJson<Target>(targetFile(name));
+  let target: Target;
+  try {
+    target = await readJson<Target>(targetFile(name));
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT")
+      throw new Error(
+        `No target "${name}" in this workspace. Run: uc-config connect ${name} --host http://<REMOTE_IP>`,
+      );
+    throw e;
+  }
   let token = process.env[target.tokenEnv];
   if (!token) {
     try {
@@ -556,6 +585,20 @@ ir.command("capture <emitterId>")
     await saveJson(resolve(root(), o.out), codes);
     console.log(
       "Captured learning status/codes. Assign chosen codes to irCode() resources.",
+    );
+  });
+program
+  .command("init")
+  .description(
+    "Scaffold a private config workspace (package.json, tsconfig, .gitignore, AGENTS.md)",
+  )
+  .action(async () => {
+    const r = await init(root(), pkgVersion);
+    for (const f of r.written) console.log(`created ${f}`);
+    if (r.packageJsonUpdated) console.log("added uc-config to package.json");
+    for (const f of r.skipped) console.log(`kept existing ${f}`);
+    console.log(
+      "Next: npm install, then start your coding agent here and ask it to set up your Remote 3.",
     );
   });
 program

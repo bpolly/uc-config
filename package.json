@@ -1,10 +1,13 @@
 {
   "name": "uc-config",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Configuration-as-code for the Unfolded Circle Remote 3, designed to be driven by coding agents",
   "license": "MIT",
+  "homepage": "https://github.com/bpolly/uc-config#readme",
+  "bugs": {
+    "url": "https://github.com/bpolly/uc-config/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bpolly/uc-config.git"
@@ -29,6 +32,9 @@
   "files": [
     "dist",
     "vendor",
+    "docs",
+    "examples",
+    "remote.config.example.ts",
     "README.md",
     "LICENSE"
   ],
@@ -43,7 +49,8 @@
     "generate": "openapi-typescript vendor/core-api.json -o src/wire.d.ts",
     "format": "prettier --write src/*.ts test/*.ts examples/*.ts remote.config.example.ts README.md docs/*.md",
     "format:check": "prettier --check src/*.ts test/*.ts examples/*.ts remote.config.example.ts README.md docs/*.md",
-    "check:examples": "tsc -p tsconfig.examples.json"
+    "check:examples": "tsc -p tsconfig.examples.json",
+    "prepublishOnly": "npm run check && npm test && npm run check:examples"
   },
   "dependencies": {
     "ajv": "^8.20.0",

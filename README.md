@@ -16,6 +16,25 @@ hardware. Humans can use it directly too.
 > for copy-paste recipes. Ask the user only for what you cannot discover:
 > the remote's IP address and the web configurator PIN.
 
+## Quick start
+
+Before you start: install Node.js 22+, and on the remote enable the web
+configurator (Settings → Profile → Web configurator). Note the remote's IP and PIN.
+
+```sh
+mkdir my-remote && cd my-remote
+npx uc-config init        # package.json, tsconfig, .gitignore, AGENTS.md
+npm install
+```
+
+Then start your coding agent in that folder and prompt:
+
+> Set up my Remote 3 at `<IP>`
+
+When the agent asks you to authenticate, run `npx uc-config auth` in your own
+terminal and enter the PIN. Don't paste the PIN into chat. That folder is your
+configuration; commit it to a **private** git repo.
+
 ## Requirements
 
 - Node.js 22+ and npm
@@ -28,7 +47,9 @@ and block writes until you reconnect.
 
 ## Setup (agent runbook)
 
-Run these from the repository root. Each step is idempotent or fails safely.
+Run these in the config workspace (the folder created by `init`) using
+`npx uc-config`, or from a clone of this repo using `npm run uc --`, as below.
+Each step is idempotent or fails safely.
 
 ```sh
 # 1. Install and build the CLI (dist/ is required by remote.config.ts imports)
@@ -36,14 +57,14 @@ npm install
 npm run build
 npm test                                   # offline, uses a mock Core API
 
-# 2. Register the remote ("living-room" is the default target name;
-#    pick any name and pass --target <name>, or export UC_TARGET=<name>)
-npm run uc -- connect living-room --host http://<REMOTE_IP>
+# 2. Register the remote under a target name ("home" here). With a single
+#    target, later commands pick it automatically; otherwise pass --target.
+npm run uc -- connect home --host http://<REMOTE_IP>
 
 # 3. Authenticate. Prompts for the web-configurator PIN in a TTY.
 #    Headless agents: have the user run this step, or pass UC_PIN in the env.
 #    Never write the PIN or key into files or chat logs.
-npm run uc -- auth --target living-room
+npm run uc -- auth
 
 # 4. Verify connectivity and API coverage
 npm run uc -- doctor
@@ -172,16 +193,9 @@ buttons, pages, macros).
 
 ## Keeping your config private
 
-The public repo holds the tool. Your configuration should live elsewhere:
-
-```sh
-mkdir ~/my-remote && cd ~/my-remote
-npm init -y && npm pkg set type=module
-npm install /path/to/uc-config         # or a git URL
-npx uc-config connect living-room --host http://<REMOTE_IP>
-# ...same runbook as above, using `npx uc-config` instead of `npm run uc --`
-git init                               # private repo; add .uc/ to .gitignore
-```
+This repo holds the tool. Your configuration belongs in its own folder, made
+with `npx uc-config init` (see [Quick start](#quick-start)), in a **private**
+git repo. `init` gitignores `.uc/`, which holds credentials.
 
 Alternatively, use `--workspace <dir>` to point the CLI at any directory holding
 `remote.config.ts` and `.uc/`. Back up `.uc/state` and `.uc/journals`
