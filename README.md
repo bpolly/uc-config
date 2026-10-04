@@ -30,12 +30,21 @@ hardware. Humans can use it directly too.
 
 ```sh
 mkdir my-remote && cd my-remote
-npx uc-config init        # creates package.json, tsconfig.json, .gitignore, AGENTS.md
+npx uc-config init
 npm install
 ```
 
-This folder will hold your remote's configuration. It's yours, not part of
-this repo.
+`init` creates the project files, then asks for the remote's IP address and
+the web configurator PIN. The PIN is typed hidden in your terminal and is only
+used once, to create an API key saved in `.uc/credentials.json`. Press Enter at
+either prompt to skip it; you can rerun `npx uc-config init` at any time and it
+picks up where it left off without overwriting anything.
+
+If `init` says a key named `uc-config` already exists, revoke that key in the
+web configurator and run `npx uc-config init` again.
+
+This folder holds your remote's configuration. It's yours, not part of this
+repo.
 
 ### 3. Let your coding agent set it up
 
@@ -44,26 +53,17 @@ prompt:
 
 > Set up my Remote 3 at `<IP>`
 
-The agent connects to the remote, imports your current setup into
-`remote.config.ts`, and records which resources it manages. This writes
-nothing to the remote.
+The agent imports your current setup into `remote.config.ts` and records which
+resources it manages. This writes nothing to the remote.
 
-### 4. Authenticate when asked
+If you skipped the PIN during `init`, the agent will ask you to run
+`npx uc-config auth` in your own terminal. **Don't paste the PIN into the
+chat.**
 
-Partway through, the agent will ask you to authenticate. In **your own
-terminal**, in the same folder, run:
+`init` also writes `CLAUDE.md`, which points Claude Code at `AGENTS.md`;
+Claude Code reads `CLAUDE.md` rather than `AGENTS.md`.
 
-```sh
-npx uc-config auth
-```
-
-Enter the PIN when prompted, approve the request on the remote if it asks, then
-tell the agent you're done. **Don't paste the PIN into the chat.**
-
-If `auth` says a key named `uc-config` already exists, revoke that key in the
-web configurator and run `auth` again.
-
-### 5. Save your config
+### 4. Save your config
 
 Commit the folder to a **private** git repo. It contains your device IDs and
 IP addresses. `.uc/` (credentials and state) is already gitignored; back it up
@@ -103,6 +103,9 @@ Each step is idempotent or fails safely.
 npm install
 npm run build
 npm test                                   # offline, uses a mock Core API
+
+# Steps 2-3 are usually already done by `npx uc-config init`. Skip them if
+# .uc/targets/*.json and .uc/credentials.json exist.
 
 # 2. Register the remote under a target name ("home" here). With a single
 #    target, later commands pick it automatically; otherwise pass --target.

@@ -9,32 +9,36 @@ the workspace's only target if exactly one is connected; otherwise `home`.
 
 ## Commands
 
-| Command                                        | Writes to remote  | Purpose                                                                 |
-| ---------------------------------------------- | ----------------- | ----------------------------------------------------------------------- |
-| `init`                                         | no                | Scaffold a private config workspace. Never overwrites files.            |
-| `connect <name> --host <url>`                  | no                | Record a target (identity, firmware). Rerun after firmware updates.     |
-| `auth`                                         | API key only      | Exchange the web-configurator PIN (`UC_PIN` or prompt) for an API key.  |
-| `doctor`                                       | no                | Verify identity and read access to every required endpoint.             |
-| `diagnose [--json]`                            | no                | Orphaned entity references, disconnected integrations, suggested fixes. |
-| `inventory [--out f] [--bindings f.ts]`        | no                | Raw (redacted) remote state; optional typed entity/command bindings.    |
-| `import [--out f.ts]`                          | no                | Generate editable config from the live remote. Never overwrites.        |
-| `compile [--config f] [--out f]`               | no                | Evaluate TS config into `.uc/build.json`. Offline.                      |
-| `plan [--out f] [--prune] [--overwrite-drift]` | no                | Three-way diff: source vs last-applied vs live.                         |
-| `apply <plan> [--adopt-only]`                  | yes               | Execute a saved plan after re-verifying preconditions.                  |
-| `check`                                        | no                | Re-plan and exit 2 if anything differs.                                 |
-| `resume`                                       | maybe             | Continue paused setup; reconcile an interrupted apply.                  |
-| `setup status/respond <key>`                   | yes               | Drive interactive integration/dock setup.                               |
-| `pairing status/respond <remoteId>`            | yes               | Bluetooth pairing steps.                                                |
-| `ir learn/capture <emitterId>`                 | yes               | Learn IR codes from a physical remote.                                  |
-| `state adopt <key> <id>` / `forget` / `move`   | no                | Edit local ownership bindings.                                          |
-| `rollback [--out f]`                           | no                | Build a compensating plan from the last journal.                        |
-| `backup --out f`                               | stops intgs       | Native full backup. Disruptive; not for routine use.                    |
-| `api <METHOD> <path> [--data json] [--write]`  | only with --write | Raw authenticated Core API call; output redacted.                       |
+| Command                                        | Writes to remote  | Purpose                                                                        |
+| ---------------------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
+| `init [--host ip] [--no-connect]`              | API key only      | Scaffold a workspace, then prompt for IP and PIN (connect + auth). Rerunnable. |
+| `connect <name> --host <url>`                  | no                | Record a target (identity, firmware). Rerun after firmware updates.            |
+| `auth`                                         | API key only      | Exchange the web-configurator PIN (`UC_PIN` or prompt) for an API key.         |
+| `doctor`                                       | no                | Verify identity and read access to every required endpoint.                    |
+| `diagnose [--json]`                            | no                | Orphaned entity references, disconnected integrations, suggested fixes.        |
+| `inventory [--out f] [--bindings f.ts]`        | no                | Raw (redacted) remote state; optional typed entity/command bindings.           |
+| `import [--out f.ts]`                          | no                | Generate editable config from the live remote. Never overwrites.               |
+| `compile [--config f] [--out f]`               | no                | Evaluate TS config into `.uc/build.json`. Offline.                             |
+| `plan [--out f] [--prune] [--overwrite-drift]` | no                | Three-way diff: source vs last-applied vs live.                                |
+| `apply <plan> [--adopt-only]`                  | yes               | Execute a saved plan after re-verifying preconditions.                         |
+| `check`                                        | no                | Re-plan and exit 2 if anything differs.                                        |
+| `resume`                                       | maybe             | Continue paused setup; reconcile an interrupted apply.                         |
+| `setup status/respond <key>`                   | yes               | Drive interactive integration/dock setup.                                      |
+| `pairing status/respond <remoteId>`            | yes               | Bluetooth pairing steps.                                                       |
+| `ir learn/capture <emitterId>`                 | yes               | Learn IR codes from a physical remote.                                         |
+| `state adopt <key> <id>` / `forget` / `move`   | no                | Edit local ownership bindings.                                                 |
+| `rollback [--out f]`                           | no                | Build a compensating plan from the last journal.                               |
+| `backup --out f`                               | stops intgs       | Native full backup. Disruptive; not for routine use.                           |
+| `api <METHOD> <path> [--data json] [--write]`  | only with --write | Raw authenticated Core API call; output redacted.                              |
 
 Exit codes: `0` ok, `1` error, `2` drift/conflicts/deferred/diagnose findings,
 `3` paused for a human step.
 
 ## Authentication
+
+`init` runs `connect` and `auth` for you when started in a terminal. Without a
+terminal (e.g. run by an agent) it only scaffolds files unless `--host` and
+`UC_PIN` are supplied. Steps already completed are skipped on reruns.
 
 `auth` prompts for the web configurator PIN. Enable the web configurator on the
 remote first, and approve the key on the remote if asked. Non-interactive

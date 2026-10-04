@@ -12,9 +12,14 @@ test("init scaffolds a workspace without overwriting existing files", async () =
     const first = await init(dir, "1.2.3");
     assert.deepEqual(first.written.sort(), [
       ".gitignore",
+      "CLAUDE.md",
       "package.json",
       "tsconfig.json",
     ]);
+    assert.match(
+      await readFile(join(dir, "CLAUDE.md"), "utf8"),
+      /^@AGENTS\.md$/m,
+    );
     assert.deepEqual(first.skipped, ["AGENTS.md"]);
     assert.equal(await readFile(join(dir, "AGENTS.md"), "utf8"), "mine\n");
     const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8"));

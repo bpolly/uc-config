@@ -4,7 +4,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
-import { CoreClient, resolveSecrets } from "./client.js";
+import { ApiError, CoreClient, resolveSecrets } from "./client.js";
 import { Adapter } from "./adapter.js";
 import { compile, validateConfig } from "./compiler.js";
 import { Engine, PendingSetup, type Journal } from "./engine.js";
@@ -130,37 +130,59 @@ program
   .requiredOption("--host <url>")
   .option("--token-env <name>", "API key environment variable", "UC_API_KEY")
   .action(async (name, o) => {
-    const client = new CoreClient(o.host);
-    const version = await client.version();
-    if (version.model !== "UCR3" || typeof version.address !== "string")
-      throw new Error("Expected an identifiable Remote 3");
-    const target: Target = {
-      host: client.base.origin,
-      identity: version.address,
-      version,
-      tokenEnv: o.tokenEnv,
-    };
-    try {
-      const old = await readJson<Target>(targetFile(name));
-      if (old.identity !== target.identity)
-        throw new Error(
-          "Target name already refers to another remote; use a new name",
-        );
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    }
-    await saveJson(targetFile(name), target);
-    console.log(
-      `Connected ${name}: ${version.model}, core ${version.core}, API ${version.api}. No configuration changed.`,
-    );
+    await connectTarget(name, o.host, o.tokenEnv);
   });
 program
   .command("auth")
   .option("--target <name>", "target", defaultTarget)
   .action(async (o) => {
-    const { target } = await load(o.target);
+    await load(o.target); // fail on a missing target before prompting
     const pin =
       process.env.UC_PIN ?? (await hiddenPrompt("Web configurator PIN: "));
+    await authenticate(o.target, pin);
+  });
+async function connectTarget(
+  name: string,
+  host: string,
+  tokenEnv = "UC_API_KEY",
+): Promise<Target> {
+  const client = new CoreClient(host);
+  const version = await client.version();
+  if (version.model !== "UCR3" || typeof version.address !== "string")
+    throw new Error("Expected an identifiable Remote 3");
+  const target: Target = {
+    host: client.base.origin,
+    identity: version.address,
+    version,
+    tokenEnv,
+  };
+  try {
+    const old = await readJson<Target>(targetFile(name));
+    if (old.identity !== target.identity)
+      throw new Error(
+        "Target name already refers to another remote; use a new name",
+      );
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+  await saveJson(targetFile(name), target);
+  console.log(
+    `Connected ${name}: ${version.model}, core ${version.core}, API ${version.api}. No configuration changed.`,
+  );
+  return target;
+}
+async function hasCredentials(target: Target): Promise<boolean> {
+  if (process.env[target.tokenEnv]) return true;
+  try {
+    const c = await readJson<Record<string, string>>(local("credentials.json"));
+    return typeof c[target.identity] === "string";
+  } catch {
+    return false;
+  }
+}
+async function authenticate(name: string, pin: string): Promise<void> {
+  {
+    const { target } = await load(name);
     const client = new CoreClient(target.host);
     validateRequest("/auth/api_keys", "POST", {
       name: "uc-config",
@@ -187,7 +209,16 @@ program
     console.log(
       "API key saved in .uc/credentials.json (mode 0600, gitignored). Approve it on the remote if requested, then run doctor.",
     );
-  });
+  }
+}
+async function question(label: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question(label)).trim();
+  } finally {
+    rl.close();
+  }
+}
 program
   .command("doctor")
   .option("--target <name>", "target", defaultTarget)
@@ -592,14 +623,85 @@ program
   .description(
     "Scaffold a private config workspace (package.json, tsconfig, .gitignore, AGENTS.md)",
   )
-  .action(async () => {
+  .option("--host <ip>", "remote IP address (skips the prompt)")
+  .option("--target <name>", "target name", "home")
+  .option("--no-connect", "only create files; don't connect or authenticate")
+  .action(async (o) => {
     const r = await init(root(), pkgVersion);
     for (const f of r.written) console.log(`created ${f}`);
     if (r.packageJsonUpdated) console.log("added uc-config to package.json");
     for (const f of r.skipped) console.log(`kept existing ${f}`);
-    console.log(
-      "Next: npm install, then start your coding agent here and ask it to set up your Remote 3.",
-    );
+    const interactive = Boolean(process.stdin.isTTY);
+    const next =
+      "Next: npm install, then start your coding agent here and ask it to set up your Remote 3.";
+    if (!o.connect) return console.log(next);
+    const name: string = o.target;
+    // 1. Connect (unless already connected).
+    let target: Target | undefined;
+    try {
+      target = await readJson<Target>(targetFile(name));
+      console.log(`Already connected to ${target.host} as "${name}".`);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+    if (!target) {
+      const host: string =
+        o.host ??
+        (interactive
+          ? await question("Remote 3 IP address (blank to skip): ")
+          : "");
+      if (!host) {
+        console.log(
+          `Skipped connecting. Later: npx uc-config connect ${name} --host http://<IP>\n${next}`,
+        );
+        return;
+      }
+      try {
+        target = await connectTarget(name, host);
+      } catch (e) {
+        console.log(
+          `Could not reach a Remote 3 at ${host}: ${(e as Error).message}\n` +
+            "Check the IP, that this computer is on the same network, and that the remote is awake (pick it up).\n" +
+            `Retry: npx uc-config init --host <IP>  (files already created are kept)`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+    }
+    // 2. Authenticate (unless a key is already available).
+    if (await hasCredentials(target)) {
+      console.log("Already authenticated.");
+      return console.log(next);
+    }
+    const pin =
+      process.env.UC_PIN ??
+      (interactive
+        ? await hiddenPrompt(
+            "Web configurator PIN (Settings → Profile → Web configurator; blank to skip): ",
+          )
+        : "");
+    if (!pin) {
+      console.log(
+        "Skipped authentication. Run `npx uc-config auth` in this folder when ready.\n" +
+          next,
+      );
+      return;
+    }
+    try {
+      await authenticate(name, pin);
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      console.log(
+        status === 401 || status === 403
+          ? "The remote rejected the PIN. Check that the web configurator is enabled and the PIN is current, then run `npx uc-config auth`."
+          : status === 400 || status === 409 || status === 422
+            ? 'An API key named "uc-config" already exists on the remote. Revoke it in the web configurator, then run `npx uc-config auth`.'
+            : `Authentication failed: ${(e as Error).message}. Retry with \`npx uc-config auth\`.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(next);
   });
 program
   .command("diagnose")

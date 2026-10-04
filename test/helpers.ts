@@ -101,6 +101,8 @@ export class FakeRemote {
       return json({});
     }
 
+    if (method === "POST" && path === "/auth/api_keys")
+      return json({ api_key: "fixture-api-key" }, 201);
     if (method === "POST" && path === "/intg/setup")
       return json({ id: body.driver_id, state: this.setupState }, 201);
     if (method === "PATCH") {

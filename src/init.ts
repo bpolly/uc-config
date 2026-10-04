@@ -11,11 +11,17 @@ managed with the \`uc-config\` CLI (v${version}). Reference docs ship with the p
 - node_modules/uc-config/docs/cli.md: every command, recovery
 - node_modules/uc-config/docs/configuration-authoring.md: config syntax and ownership
 
-## First run (no .uc/targets/ yet)
+## First run
 
-1. \`npx uc-config connect home --host http://<IP>\`. Ask the user for the IP if not given.
-2. Ask the user to run \`npx uc-config auth\` in their own terminal (the web
-   configurator must be enabled on the remote). Never ask for the PIN in chat.
+\`npx uc-config init\` usually already connected and authenticated. Check what
+exists, and skip steps that are done:
+
+1. No \`.uc/targets/*.json\`: run \`npx uc-config connect home --host http://<IP>\`.
+   Ask the user for the IP if not given.
+2. No \`.uc/credentials.json\` (and no \`UC_API_KEY\` env): ask the user to run
+   \`npx uc-config auth\` in their own terminal (the web configurator must be
+   enabled on the remote). Never ask for the PIN in chat, and never run \`auth\`
+   yourself; it needs a real terminal.
 3. \`npx uc-config doctor\`
 4. \`npx uc-config inventory --bindings generated/devices.ts\`
 5. \`npx uc-config import --out remote.config.ts\`
@@ -52,6 +58,16 @@ the UC Integration Manager (http://<remote>:9999); run diagnose after any update
 
 \`npm update uc-config\`, then compile and plan. The plan must show 0 operations
 before you make any other change.
+`;
+
+// Claude Code reads CLAUDE.md, not AGENTS.md. Newer releases follow the
+// @-import; the prose line covers releases that don't support imports.
+const claude = `# Remote 3 configuration (uc-config)
+
+Read AGENTS.md in this folder before doing anything. It is the authoritative
+guide for working here: setup steps, editing rules and safety limits.
+
+@AGENTS.md
 `;
 
 const tsconfig = {
@@ -132,5 +148,6 @@ export async function init(dir: string, version: string): Promise<InitResult> {
   await put("tsconfig.json", JSON.stringify(tsconfig, null, 2) + "\n");
   await put(".gitignore", gitignore);
   await put("AGENTS.md", agents(version));
+  await put("CLAUDE.md", claude);
   return result;
 }
