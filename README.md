@@ -289,11 +289,13 @@ buttons, pages, macros).
 > **Integration updates can drop configured entities**, even when the manager
 > says configuration is preserved. Every activity using them becomes orphaned.
 > Keep the manager's _Auto update_ setting off, and after every integration
-> update run:
+> update run this in your config workspace:
 >
 > ```sh
-> npm run uc -- diagnose && npm run uc -- plan
+> npx uc-config diagnose && npx uc-config plan
 > ```
+>
+> (From a clone of this repo, use `npm run uc -- diagnose && npm run uc -- plan`.)
 >
 > Updates marked as _not preserving configuration_ additionally require
 > re-running that integration's setup.
