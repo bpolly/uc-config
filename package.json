@@ -1,6 +1,6 @@
 {
   "name": "uc-config",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Configuration-as-code for the Unfolded Circle Remote 3, designed to be driven by coding agents",
   "license": "MIT",

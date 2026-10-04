@@ -29,7 +29,7 @@ import { rollbackPlan } from "./recovery.js";
 import { validateRequest } from "./schema.js";
 import { diagnose, formatDiagnosis } from "./diagnose.js";
 import { init } from "./init.js";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 const pkgVersion: string = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ).version;
@@ -289,6 +289,12 @@ program
         process.exitCode = 1;
       }
     }
+    const backups = listBackups(root());
+    console.log(
+      backups.length
+        ? `Full backups: ${backups.length} (latest ${backups.at(-1)!.file})`
+        : "No full backup yet. Offer the user one: npx uc-config backup",
+    );
   });
 program
   .command("inventory")
@@ -699,22 +705,77 @@ program
   });
 program
   .command("backup")
+  .description(
+    "Full native backup of the remote into backups/ (timestamped; never overwrites). Briefly stops integrations and docks.",
+  )
   .option("--target <name>", "target", defaultTarget)
-  .requiredOption("--out <file>", "native backup archive")
+  .option("--out <file>", "archive path (default: backups/<timestamp>)")
+  .option("--list", "list existing backups; no remote access")
   .action(async (o) => {
+    if (o.list) {
+      const list = listBackups(root());
+      console.log(
+        list.length
+          ? list.map((b) => `${b.file}  ${b.size}`).join("\n")
+          : "No full backups in backups/. Run: npx uc-config backup",
+      );
+      return;
+    }
     await withLock(local(`locks/${targetName(o.target)}.lock`), async () => {
       const { client, target } = await load(o.target);
       await client.verifyTarget(target);
       console.log(
-        "Exporting native backup: the remote temporarily stops integrations and docks. Keep the archive private; it may contain credentials.",
+        "Exporting full backup: the remote stops integrations and docks for a few seconds, then restarts them.",
       );
-      const bytes = await client.download("/system/backup/export");
-      const file = resolve(root(), o.out);
-      await mkdir(resolve(file, ".."), { recursive: true });
+      const { bytes, filename } = await client.downloadFile(
+        "/system/backup/export",
+      );
+      const ext =
+        /\.(tar\.gz|tgz|tar|zip)$/i.exec(filename ?? "")?.[0] ?? ".tar";
+      const stamp = new Date()
+        .toISOString()
+        .replace(/:/g, "")
+        .replace(/\..+/, "");
+      const out =
+        o.out ??
+        join(
+          BACKUP_DIR,
+          `${target.version.model.toLowerCase()}-${stamp}${ext}`,
+        );
+      const file = resolve(root(), out);
+      await mkdir(resolve(file, ".."), { recursive: true, mode: 0o700 });
+      // The archive holds integration credentials: keep backups/ out of git.
+      if (resolve(file, "..") === resolve(root(), BACKUP_DIR))
+        await writeFile(
+          resolve(root(), BACKUP_DIR, ".gitignore"),
+          "# Full remote backups contain credentials. Never commit them.\n*\n",
+        );
       await writeFile(file, bytes, { mode: 0o600, flag: "wx" });
-      console.log(`Backup saved to ${o.out}`);
+      console.log(
+        `Backup saved to ${out} (${formatSize(bytes.length)}). It is unencrypted and contains integration credentials: keep it private. Restore it from the web configurator.`,
+      );
     });
   });
+const BACKUP_DIR = "backups";
+function formatSize(n: number): string {
+  return n > 1048576
+    ? `${(n / 1048576).toFixed(1)} MB`
+    : `${Math.ceil(n / 1024)} KB`;
+}
+function listBackups(dir: string): Array<{ file: string; size: string }> {
+  try {
+    const d = join(dir, BACKUP_DIR);
+    return readdirSync(d)
+      .filter((f) => /\.(tar\.gz|tgz|tar|zip)$/i.test(f))
+      .sort()
+      .map((f) => ({
+        file: join(BACKUP_DIR, f),
+        size: formatSize(statSync(join(d, f)).size),
+      }));
+  } catch {
+    return [];
+  }
+}
 const ir = program.command("ir");
 ir.command("learn <emitterId>")
   .option("--target <name>", "target", defaultTarget)

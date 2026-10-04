@@ -316,18 +316,25 @@ npm run uc -- rollback --out .uc/rollback.json   # builds a compensating plan
 npm run uc -- apply .uc/rollback.json
 ```
 
-## Back up everything (scheduled job friendly)
+## Full remote backup
 
 ```sh
-D=backups/$(date +%F); mkdir -p "$D"
-npm run -s uc -- inventory --out "$D/inventory.json"           # redacted raw state
-npm run -s uc -- import --out "$D/remote.config.ts"            # readable snapshot
-tar czf "$D/dotuc.tgz" --exclude credentials.json .uc          # ownership state
-curl -sf http://<REMOTE_IP>:9999/api/backups/download -o "$D/intg-manager.json"  # Integration Manager
+npx uc-config backup --list   # existing backups (no remote access)
+npx uc-config backup          # new backups/<model>-<timestamp>.tar
 ```
 
-`npm run uc -- backup --out PRIVATE_PATH` produces the remote's native full
-backup, but it **temporarily stops integrations and docks**, so don't schedule it.
+This is the remote's own full backup, the same archive the web configurator
+downloads: activities, macros, pages, integrations and their settings, icons
+and IR codes. Each run adds a file and keeps the older ones. `--out <path>`
+saves somewhere else.
+
+- It **stops integrations and docks for a few seconds**. Ask the user first,
+  and don't schedule it.
+- The archive is unencrypted and contains integration credentials.
+  `backups/` is gitignored (and gets its own `.gitignore`); keep it private.
+- It does not include Wi-Fi settings, the admin or web-configurator PIN, or
+  API keys, so `npx uc-config auth` is needed again after a restore.
+- Restore it in the web configurator. uc-config never restores.
 
 ## Nightly health check (for an agent cron job)
 

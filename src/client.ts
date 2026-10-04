@@ -134,6 +134,12 @@ export class CoreClient {
     throw new Error(`${path}: pagination limit exceeded`);
   }
   async download(path: string): Promise<Uint8Array> {
+    return (await this.downloadFile(path)).bytes;
+  }
+  /** Bytes plus the server-suggested filename (Content-Disposition), if any. */
+  async downloadFile(
+    path: string,
+  ): Promise<{ bytes: Uint8Array; filename?: string }> {
     if (!path.startsWith("/") || path.startsWith("//") || path.includes(".."))
       throw new Error("Invalid API path");
     const response = await this.transport(new URL(path.slice(1), this.base), {
@@ -142,7 +148,12 @@ export class CoreClient {
       redirect: "error",
     });
     if (!response.ok) throw new ApiError(response.status, "GET", path);
-    return new Uint8Array(await response.arrayBuffer());
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    return {
+      bytes: new Uint8Array(await response.arrayBuffer()),
+      ...(m ? { filename: decodeURIComponent(m[1]!) } : {}),
+    };
   }
   async version(): Promise<Version> {
     return this.get<Version>("/pub/version");

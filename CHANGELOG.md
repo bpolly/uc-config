@@ -9,6 +9,22 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.3.1
+
+Action required: optional, run `npx uc-config init --refresh-docs` to get the
+backup instructions in AGENTS.md.
+
+- `backup` takes no arguments now: it saves the remote's full native backup to
+  `backups/<model>-<timestamp>.tar` (extension from the remote's filename) and
+  never overwrites, so older backups are kept. `--out` still works.
+- `backup --list` lists existing backups without contacting the remote.
+  `doctor` reports how many there are, or suggests making the first one.
+- `backup` writes `backups/.gitignore` so archives (unencrypted, with
+  integration credentials) stay out of git even in existing workspaces. New
+  workspaces also ignore `backups/` in the top-level `.gitignore`.
+- AGENTS.md: agents offer a first backup when none exists, always ask before
+  running one, and never restore.
+
 ## 0.3.0
 
 Action required: run `npx uc-config init --refresh-docs`. The agent

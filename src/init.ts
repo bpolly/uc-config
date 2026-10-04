@@ -47,6 +47,8 @@ exists, and skip steps that are done:
    never writes to the remote.
 5. \`npx uc-config compile && npx uc-config check\` (must be 0 operations).
 6. \`git init && git add -A && git commit -m "Import Remote 3 config"\`
+7. If \`npx uc-config backup --list\` shows no backups, offer the user a full
+   backup (see "Full backup" below). Ask first; don't run it unprompted.
 
 If \`.uc/\` already exists, reuse it. Don't re-auth. If remote.config.ts or
 \`.uc/state\` is lost, the remote still has everything: run sync again.
@@ -74,6 +76,24 @@ The remote is the source of truth; this folder is a working copy of it.
 - The plan must contain only the intended change. Anything else: stop and ask.
 - Never use --overwrite-drift or --prune without the user's say-so.
 - Never put secrets in remote.config.ts or print .uc/credentials.json.
+
+## Full backup
+
+\`npx uc-config backup\` saves the remote's own full backup (the same archive
+as the web configurator's backup page) to \`backups/<model>-<timestamp>.tar\`.
+It covers activities, macros, pages, integrations and their settings, icons
+and IR codes, and is what you restore after a factory reset.
+
+- Whenever you work in this folder and \`backup --list\` (or \`doctor\`) shows
+  no backup, ask the user once whether they'd like one now.
+- Always ask before running it, and tell the user first: integrations and docks
+  stop for a few seconds and the remote shouldn't be used meanwhile.
+- Each run adds a new file; older backups are kept. \`backup --list\` lists them.
+  Only delete old ones when the user asks.
+- Archives are unencrypted and contain integration credentials. backups/ is
+  gitignored: never commit, upload or print them.
+- Restoring replaces the remote's configuration: the user does that in the web
+  configurator. Never restore from here.
 
 ## When something is broken
 
@@ -131,6 +151,8 @@ const tsconfig = {
 const gitignore = `node_modules/
 # Credentials, state and journals. Back up .uc/state and .uc/journals privately.
 .uc/
+# Full remote backups: unencrypted, contain integration credentials.
+backups/
 .env
 .env.*
 `;
