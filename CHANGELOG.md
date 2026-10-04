@@ -9,6 +9,17 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.2.3
+
+Action required: none. Docs only.
+
+- README: what to do when a plan contains operations you didn't make, how to
+  read full sequence changes from `.uc/plan.json`, telling a sleeping remote
+  from a machine without LAN access, and what `deferred` means.
+- Snippets: corrected the entity-swap recipe. Swapped-in commands are deferred
+  until the `entity_ids` change is applied, rather than failing with
+  `Cannot verify command`.
+
 ## 0.2.2
 
 Action required: optional. Run `npx uc-config init --refresh-docs` to get the

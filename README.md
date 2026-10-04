@@ -208,6 +208,19 @@ npm run uc -- check             # must report 0 operations
 remote identity, firmware and preconditions first. A plan with zero operations
 needs no apply. See [docs/snippets.md](docs/snippets.md) for common edits.
 
+**If the plan touches things you didn't edit, stop.** Those operations are
+earlier source changes that were never applied, or edits made on the remote
+since. Don't apply them along with your change: sync with the live remote first
+(see [Pull changes made in the web configurator](docs/snippets.md#pull-changes-made-in-the-web-configurator)),
+then replan until only your change is left.
+
+**The plan output shortens long sequences.** To see the exact step-by-step
+change, compare each operation's `before` with its `desired` in `.uc/plan.json`:
+
+```sh
+jq '.operations[] | {key, action, before, desired}' .uc/plan.json
+```
+
 ## Diagnostics and fixing problems
 
 Run `diagnose` whenever something looks wrong on the remote, after any
@@ -235,14 +248,15 @@ For each orphan it proposes a fix:
 
 Plan/apply problems:
 
-| Message                                         | Meaning and fix                                                                                                                                                                         |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Drift at <fields>`                             | Someone (or a driver update) changed an owned field on the remote. Copy the live value into source, or rerun `plan --overwrite-drift` only if the user wants the source value restored. |
-| `Managed resource disappeared`                  | Resource was deleted on the remote. Run `diagnose`; re-add or remove from source.                                                                                                       |
-| `Cannot verify command`                         | `cmd_id` isn't advertised by that entity, or the entity isn't in the activity's `entity_ids`. Check `generated/devices.ts`, refresh inventory.                                          |
-| `Remote firmware changed; reconnect and replan` | Remote auto-updated. Rerun `connect <name> --host ...` (keeps credentials), then plan.                                                                                                  |
-| `transport failed` / timeouts                   | Remote asleep (wake it) or no LAN access from this machine.                                                                                                                             |
-| Uncertain writes after a crash                  | Run `resume`. Never blindly rerun apply; use `state adopt KEY ID` if a create actually succeeded.                                                                                       |
+| Message                                          | Meaning and fix                                                                                                                                                                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Drift at <fields>`                              | Someone (or a driver update) changed an owned field on the remote. Copy the live value into source, or rerun `plan --overwrite-drift` only if the user wants the source value restored.            |
+| `Managed resource disappeared`                   | Resource was deleted on the remote. Run `diagnose`; re-add or remove from source.                                                                                                                  |
+| `Cannot verify command`                          | `cmd_id` isn't advertised by that entity, or the entity isn't in the activity's `entity_ids`. Check `generated/devices.ts`, refresh inventory.                                                     |
+| `Remote firmware changed; reconnect and replan`  | Remote auto-updated. Rerun `connect <name> --host ...` (keeps credentials), then plan.                                                                                                             |
+| `transport failed` / timeouts                    | Remote asleep, or this machine has no LAN access. Ping the router and another LAN device: if they fail too, it's this machine (on macOS, Local Network privacy), and waking the remote won't help. |
+| `deferred ...: apply prerequisites, then replan` | The item depends on another change in the same plan (e.g. a new entity in `entity_ids`). Apply the plan, then plan again for the deferred items.                                                   |
+| Uncertain writes after a crash                   | Run `resume`. Never blindly rerun apply; use `state adopt KEY ID` if a create actually succeeded.                                                                                                  |
 
 `npm run uc -- api GET <path>` makes a raw authenticated Core API read (output
 redacted). Non-GET methods require `--write` and should only be used for the

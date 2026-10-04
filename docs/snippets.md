@@ -254,9 +254,10 @@ npm run uc -- compile && npm run uc -- plan --out .uc/plan.json && npm run uc --
 npm run uc -- diagnose
 ```
 
-If the plan reports `Cannot verify command` for the swapped entity, the
-activity's live `included_entities` still lists the old one. Apply the
-`entity_ids` change first, then replan for the buttons and sequences.
+Buttons and sequences that use the new entity show up as **deferred** until the
+activity's `entity_ids` change is on the remote. Apply the plan, then plan and
+apply again for the deferred items. `check` must report 0 operations at the
+end.
 
 **Drift from a driver renaming something** (`Drift at data.name`): copy the
 live value (shown in the plan) into source, then:
