@@ -16,24 +16,71 @@ hardware. Humans can use it directly too.
 > for copy-paste recipes. Ask the user only for what you cannot discover:
 > the remote's IP address and the web configurator PIN.
 
-## Quick start
+## Quick start (for humans)
 
-Before you start: install Node.js 22+, and on the remote enable the web
-configurator (Settings → Profile → Web configurator). Note the remote's IP and PIN.
+### 1. Before you start
+
+- Install [Node.js](https://nodejs.org/) 22 or newer.
+- On the remote, enable the web configurator: **Settings → Profile → Web
+  configurator**. Note the **PIN** it shows.
+- Find the remote's **IP address**. It's shown in the remote's network
+  settings, or in your router's device list. The computer you use must be on the same network as the remote.
+
+### 2. Create your config folder
 
 ```sh
 mkdir my-remote && cd my-remote
-npx uc-config init        # package.json, tsconfig, .gitignore, AGENTS.md
+npx uc-config init        # creates package.json, tsconfig.json, .gitignore, AGENTS.md
 npm install
 ```
 
-Then start your coding agent in that folder and prompt:
+This folder will hold your remote's configuration. It's yours, not part of
+this repo.
+
+### 3. Let your coding agent set it up
+
+Start your coding agent (Claude Code, Codex, Cursor, etc.) in that folder and
+prompt:
 
 > Set up my Remote 3 at `<IP>`
 
-When the agent asks you to authenticate, run `npx uc-config auth` in your own
-terminal and enter the PIN. Don't paste the PIN into chat. That folder is your
-configuration; commit it to a **private** git repo.
+The agent connects to the remote, imports your current setup into
+`remote.config.ts`, and records which resources it manages. This writes
+nothing to the remote.
+
+### 4. Authenticate when asked
+
+Partway through, the agent will ask you to authenticate. In **your own
+terminal**, in the same folder, run:
+
+```sh
+npx uc-config auth
+```
+
+Enter the PIN when prompted, approve the request on the remote if it asks, then
+tell the agent you're done. **Don't paste the PIN into the chat.**
+
+If `auth` says a key named `uc-config` already exists, revoke that key in the
+web configurator and run `auth` again.
+
+### 5. Save your config
+
+Commit the folder to a **private** git repo. It contains your device IDs and
+IP addresses. `.uc/` (credentials and state) is already gitignored; back it up
+separately.
+
+### Day to day
+
+Ask your agent for changes in plain language, for example:
+
+> Make the NEXT button skip chapters in the movie activity
+
+> Add a page to Watch TV with buttons for Netflix and YouTube
+
+> Something on the remote says "orphaned entity". Fix it.
+
+The agent shows a plan of what will change before applying it. After you update
+an integration in the Integration Manager, ask the agent to run diagnostics.
 
 ## Requirements
 
