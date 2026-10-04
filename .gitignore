@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.uc/
+.env
+.env.*
+*.tsbuildinfo
+
+# Your remote's configuration is personal (IPs, serials, device IDs).
+# Keep it in a private repo; see README "Keeping your config private".
+remote.config.ts
+generated/
+imported*.config.ts

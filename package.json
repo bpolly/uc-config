@@ -1,0 +1,60 @@
+{
+  "name": "uc-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Configuration-as-code for the Unfolded Circle Remote 3, designed to be driven by coding agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bpolly/uc-config.git"
+  },
+  "keywords": [
+    "unfolded-circle",
+    "remote-3",
+    "home-theater",
+    "configuration-as-code",
+    "infrastructure-as-code",
+    "ai-agents"
+  ],
+  "bin": {
+    "uc-config": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "vendor",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-types.mjs",
+    "check": "tsc --noEmit",
+    "test": "npm run build --silent && tsx --test test/*.test.ts",
+    "uc": "tsx src/cli.ts",
+    "generate": "openapi-typescript vendor/core-api.json -o src/wire.d.ts",
+    "format": "prettier --write src/*.ts test/*.ts examples/*.ts remote.config.example.ts README.md docs/*.md",
+    "format:check": "prettier --check src/*.ts test/*.ts examples/*.ts remote.config.example.ts README.md docs/*.md",
+    "check:examples": "tsc -p tsconfig.examples.json"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "commander": "^15.0.0",
+    "tsx": "^4.23.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.8",
+    "typescript": "^5.9.3"
+  }
+}
