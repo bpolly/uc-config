@@ -65,15 +65,38 @@ export async function inventory(client: CoreClient): Promise<Inventory> {
   }
   return result;
 }
+/** Display name from a string or a localized {en: ...} map. */
+function nameOf(item: unknown): string | undefined {
+  const n = isObject(item) ? item.name : undefined;
+  if (typeof n === "string") return n;
+  if (isObject(n)) {
+    const v = n.en ?? Object.values(n).find((x) => typeof x === "string");
+    if (typeof v === "string") return v;
+  }
+  return undefined;
+}
+/** snake_case key segment; falls back to the id when the name has no letters/digits. */
+export function slug(name: string | undefined, fallback: string): string {
+  const s = (x: string) =>
+    x
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  return s(name ?? "") || s(fallback) || "item";
+}
 export async function importConfig(
   client: CoreClient,
 ): Promise<{ config: Config; warnings: string[] }> {
   const inv = await inventory(client);
   const resources: Record<string, Resource> = {};
   const warnings = [...inv.unsupported.map((p) => `Unsupported endpoint ${p}`)];
-  let serial = 0;
-  const add = (r: Resource) => {
-    const key = `${r.kind}${++serial}`;
+  // Readable keys from display names ("Play PS5" -> activity.play_ps5);
+  // collisions get _2, _3, ... in import order.
+  const add = (r: Resource, base: string) => {
+    let key = base;
+    for (let n = 2; key in resources; n++) key = `${base}_${n}`;
     resources[key] = r;
     return key;
   };
@@ -108,7 +131,7 @@ export async function importConfig(
         );
         continue;
       }
-      const key = add(r);
+      const key = add(r, `${kind}.${slug(nameOf(item), id)}`);
       if (kind === "integration" || kind === "dock")
         warnings.push(
           `${key}: existing resource imported; supply create/setup inputs and secret references to reproduce on a new target`,
@@ -128,26 +151,33 @@ export async function importConfig(
           for (const b of buttons.filter(isObject))
             for (const press of ["short_press", "long_press"])
               if (isObject(b[press]))
-                add({
-                  kind: kind === "activity" ? "activityButton" : "remoteButton",
-                  parent: { $ref: key },
-                  id: `${b.button}/${press}`,
-                  data: { [press]: b[press]! },
-                });
+                add(
+                  {
+                    kind:
+                      kind === "activity" ? "activityButton" : "remoteButton",
+                    parent: { $ref: key },
+                    id: `${b.button}/${press}`,
+                    data: { [press]: b[press]! },
+                  },
+                  `${key}.button.${slug(String(b.button), "button")}_${press}`,
+                );
           const pages = await client.list(
             `/${prefix}/${encodeURIComponent(id)}/ui/pages`,
           );
           for (const p of pages)
-            add({
-              kind: kind === "activity" ? "activityPage" : "remotePage",
-              parent: { $ref: key },
-              id: String(p.page_id),
-              data: writable(
-                `/${prefix}/{entityId}/ui/pages/{pageId}`,
-                "patch",
-                p,
-              ),
-            });
+            add(
+              {
+                kind: kind === "activity" ? "activityPage" : "remotePage",
+                parent: { $ref: key },
+                id: String(p.page_id),
+                data: writable(
+                  `/${prefix}/{entityId}/ui/pages/{pageId}`,
+                  "patch",
+                  p,
+                ),
+              },
+              `${key}.page.${slug(nameOf(p), String(p.page_id))}`,
+            );
         } catch (e) {
           if (e instanceof ApiError && [404, 405].includes(e.status))
             warnings.push(
@@ -163,16 +193,19 @@ export async function importConfig(
           );
           for (const c of list) {
             const group = child === "groups";
-            add({
-              kind: group ? "profileGroup" : "profilePage",
-              parent: { $ref: key },
-              id: String(c[group ? "group_id" : "page_id"]),
-              data: writable(
-                `/profiles/{profileId}/${child}/{${group ? "groupId" : "pageId"}}`,
-                "patch",
-                c,
-              ),
-            });
+            add(
+              {
+                kind: group ? "profileGroup" : "profilePage",
+                parent: { $ref: key },
+                id: String(c[group ? "group_id" : "page_id"]),
+                data: writable(
+                  `/profiles/{profileId}/${child}/{${group ? "groupId" : "pageId"}}`,
+                  "patch",
+                  c,
+                ),
+              },
+              `${key}.${group ? "group" : "page"}.${slug(nameOf(c), String(c[group ? "group_id" : "page_id"]))}`,
+            );
           }
         }
       if (collection === "irRemotes") {
@@ -185,15 +218,18 @@ export async function importConfig(
               code.code.value &&
               code.code.format
             )
-              add({
-                kind: "irCode",
-                parent: { $ref: key },
-                id: code.cmd_id,
-                data: {
-                  format: (code.code as ObjectValue).format!,
-                  value: (code.code as ObjectValue).value!,
+              add(
+                {
+                  kind: "irCode",
+                  parent: { $ref: key },
+                  id: code.cmd_id,
+                  data: {
+                    format: (code.code as ObjectValue).format!,
+                    value: (code.code as ObjectValue).value!,
+                  },
                 },
-              });
+                `${key}.ir.${slug(code.cmd_id, "code")}`,
+              );
       }
     }
   }
@@ -204,12 +240,15 @@ export async function importConfig(
       !item.integration_id
     )
       continue;
-    add({
-      kind: "entity",
-      id: String(item.entity_id),
-      parent: item.integration_id,
-      data: writable("/entities/{entityId}", "patch", item),
-    });
+    add(
+      {
+        kind: "entity",
+        id: String(item.entity_id),
+        parent: item.integration_id,
+        data: writable("/entities/{entityId}", "patch", item),
+      },
+      `entity.${slug(nameOf(item), String(item.entity_id))}`,
+    );
   }
   const usedDrivers = new Set(
     (inv.collections.integrations ?? []).map((i) => i.driver_id),
@@ -225,7 +264,10 @@ export async function importConfig(
       );
       continue;
     }
-    add({ kind: "driver", id: String(item.driver_id), data });
+    add(
+      { kind: "driver", id: String(item.driver_id), data },
+      `driver.${slug(nameOf(item), String(item.driver_id))}`,
+    );
   }
   for (const [section, data] of Object.entries(inv.settings)) {
     const picked = writable(`/cfg/${section}`, "patch", data);
@@ -241,7 +283,10 @@ export async function importConfig(
     }
     if (!Object.keys(picked).length) continue;
     if (!secretFields(picked).length)
-      add({ kind: "settings", id: section, data: picked });
+      add(
+        { kind: "settings", id: section, data: picked },
+        `settings.${section}`,
+      );
     else
       warnings.push(
         `${section}: secret-bearing settings omitted; configure secret references`,

@@ -276,8 +276,9 @@ npm run uc -- compile --config .uc/imported-$(date +%F).config.ts --out .uc/impo
 diff <(jq -S . .uc/build.json) <(jq -S . .uc/imported-build.json) | less
 ```
 
-Imported keys are generic (`activity3`). Match resources by `kind` + `id` and
-copy the changed fields into `remote.config.ts`. Then `plan` should report
+Imported keys come from display names (`activity.watch_tv`), so they usually
+match yours, but a renamed activity gets a different key. Match resources by
+`kind` + `id` and copy the changed fields into `remote.config.ts`. Then `plan` should report
 0 operations.
 
 ## Undo the last apply

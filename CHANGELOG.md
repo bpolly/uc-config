@@ -9,6 +9,15 @@ npx uc-config init --refresh-docs
 npx uc-config compile && npx uc-config plan   # must show 0 operations
 ```
 
+## 0.2.4
+
+Action required: none. Existing configs keep their keys.
+
+- `import` builds readable keys from display names (`activity.play_ps5`,
+  `activity.play_ps5.button.mute_short_press`, `entity.living_room_lamp`)
+  instead of `activity8`. Duplicate names get `_2`, `_3`. To rename keys in an
+  existing config, use `state move OLD NEW`.
+
 ## 0.2.3
 
 Action required: none. Docs only.

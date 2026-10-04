@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeRemote, target } from "./helpers.js";
 import { activity, defineRemote, page, ref } from "../src/dsl.js";
-import { importConfig } from "../src/inventory.js";
+import { importConfig, slug } from "../src/inventory.js";
 import { makePlan } from "../src/planner.js";
 
 test("adopted parents and dependent pages can be planned and adopted together without writes", async () => {
@@ -110,4 +110,28 @@ test("import handles disabled voice assistant and includes external remote layou
   );
   assert.ok(warnings.some((w) => w.includes("disabled assistant")));
   assert.deepEqual(remote.writes, []);
+});
+
+test("import builds readable keys from names and de-duplicates collisions", async () => {
+  assert.equal(slug("Play PS5", "x"), "play_ps5");
+  assert.equal(slug("Café Lights!", "x"), "cafe_lights");
+  assert.equal(slug("★", "uc.main.ABC-1"), "uc_main_abc_1");
+  const remote = new FakeRemote();
+  const a = (id: string, name: string) => {
+    const v = {
+      entity_id: id,
+      name: { en: name },
+      options: { entity_ids: [] },
+    };
+    remote.data[`/activities/${id}`] = v;
+    remote.data[`/activities/${id}/buttons`] = [];
+    remote.data[`/activities/${id}/ui/pages`] = [];
+    return v;
+  };
+  remote.data["/activities"] = [a("a1", "Watch TV"), a("a2", "Watch TV")];
+  const { config } = await importConfig(remote.harness().client);
+  const keys = Object.keys(config.resources).filter((k) =>
+    k.startsWith("activity."),
+  );
+  assert.deepEqual(keys, ["activity.watch_tv", "activity.watch_tv_2"]);
 });
